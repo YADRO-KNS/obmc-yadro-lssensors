@@ -4,22 +4,38 @@
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
+#include <getopt.h>
 
 #include <string>
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/exception.hpp>
 
-typedef std::vector<std::string> strarray;
+/**
+ * @brief open DBus connection
+ *
+ * @param host - remote host
+ *
+ * @return DBus connection object
+ */
+inline sdbusplus::bus::bus open_system(const char *host = nullptr)
+{
+    if (!host)
+        return sdbusplus::bus::new_system();
 
-static auto bus = sdbusplus::bus::new_system();
-
+    printf("Open DBus session to %s\n", host);
+    sd_bus* b = nullptr;
+    sd_bus_open_system_remote(&b, host);
+    return sdbusplus::bus::bus(b, std::false_type());
+}
 /**
  * @brief Request sensors values
  *
+ * @param bus    - DBus connection object
  * @param device - DBus targer who containt sensor
  * @param sensor - Sensors path
  */
-void get_sensor_value(const char *device, const char *sensor)
+void get_sensor_value(sdbusplus::bus::bus &bus,
+                      const char *device, const char *sensor)
 {
     // --- Ask DBus for all sensors properties
     auto m = bus.new_method_call(device,
@@ -75,13 +91,57 @@ void get_sensor_value(const char *device, const char *sensor)
  *
  * @return
  */
-int main(void)
+int main(int argc, char *argv[])
 {
+    const char * host     = nullptr;
+    bool         showhelp = false;
+    const struct option opts[] = {
+        { "host", required_argument, nullptr, 'H'  },
+        { "help",   no_argument,     nullptr, 'h'  },
+
+        // --- end of array ---
+        { nullptr,  0,                 nullptr, '\0' }
+    };
+
+    int c;
+    while ((c = getopt_long(argc, argv, "H:h", opts, nullptr)) != -1)
+    {
+        switch (c)
+        {
+            case 'H':
+                if (optarg)
+                    host = optarg;
+                else
+                {
+                    fprintf(stderr, "Remote host required with this option!\n");
+                    showhelp = true;
+                }
+                break;
+            case 'h': showhelp = true; break;
+            default:
+                fprintf(stderr, "Unknown option found '%c'!\n", c);
+                showhelp = true;
+                break;
+        }
+    }
+
+    if (showhelp)
+    {
+        fprintf(stderr,
+                "Usage: %s [options]\n"
+                "Options:\n"
+                "  -H, --host=[USER@]HOST   Operate on remote host (over ssh)\n"
+                "  -h, --help               Show this help\n",
+                argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    auto bus    = open_system(host);
     auto method = bus.new_method_call("xyz.openbmc_project.ObjectMapper",
                                       "/xyz/openbmc_project/object_mapper",
                                       "xyz.openbmc_project.ObjectMapper",
                                       "GetSubTree");
-    method.append("/xyz/openbmc_project/sensors", 5, strarray());
+    method.append("/xyz/openbmc_project/sensors", 5, std::vector<std::string>());
 
     auto reply = bus.call(method);
     if (reply.is_method_error())
@@ -90,14 +150,14 @@ int main(void)
         return EXIT_FAILURE;
     }
 
-    std::map<std::string, std::map<std::string, strarray> > data;
+    std::map<std::string, std::map<std::string, std::vector<std::string> > > data;
     reply.read(data);
 
     for (auto p = data.begin(); p != data.end(); ++p)
     {
         for (auto d = p->second.begin(); d != p->second.end(); ++d)
-            get_sensor_value(d->first.c_str(), p->first.c_str());
+            get_sensor_value(bus, d->first.c_str(), p->first.c_str());
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
