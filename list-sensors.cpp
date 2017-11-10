@@ -86,6 +86,29 @@ void get_sensor_value(sdbusplus::bus::bus &bus,
     // --- End of line ---
     printf("\n");
 }
+
+/**
+ * @brief compare sensors path with numbers
+ */
+struct cmp_sensors_name
+{
+    bool operator()(const std::string &a, const std::string &b) const
+    {
+        size_t ia = a.find_last_not_of("0123456789") + 1;
+        size_t ib = b.find_last_not_of("0123456789") + 1;
+
+        if (ia == ib && ia < a.length() && ib < b.length())
+        {
+            int r = a.compare(0, ia, b.substr(0, ib));
+            if (0 == r)
+                return std::stoi(a.substr(ia)) < std::stoi(b.substr(ib));
+            return r < 0;
+        }
+        return a < b;
+    }
+};
+typedef std::map<std::string, std::string, cmp_sensors_name> sensors_t;
+
 /**
  * @brief Application entry point
  *
@@ -150,10 +173,15 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    // NOTE: sdbusplus do not allowing std::map with custom predicate
     std::map<std::string, std::map<std::string, std::vector<std::string> > > data;
     reply.read(data);
 
-    for (auto p = data.begin(); p != data.end(); ++p)
+    // --- Using sorted py path with nums order ---
+    std::map<std::string, std::map<std::string, std::vector<std::string> >, cmp_sensors_name> sorted_data;
+    sorted_data.insert(data.begin(), data.end());
+
+    for (auto p = sorted_data.begin(); p != sorted_data.end(); ++p)
     {
         for (auto d = p->second.begin(); d != p->second.end(); ++d)
             get_sensor_value(bus, d->first.c_str(), p->first.c_str());
