@@ -1,7 +1,7 @@
-sbin_PROGRAMS = list-sensors
+sbin_PROGRAMS = sensors
 
-list_sensors_SOURCES = list-sensors.cpp
+sensors_SOURCES = list-sensors.cpp
 
-list_sensors_CXXFLAGS = $(SDBUSPLUS_CFLAGS)
-list_sensors_LDFLAGS  = $(SDBUSPLUS_LIBS)
+sensors_CXXFLAGS = $(SDBUSPLUS_CFLAGS)
+sensors_LDFLAGS  = $(SDBUSPLUS_LIBS)
 
