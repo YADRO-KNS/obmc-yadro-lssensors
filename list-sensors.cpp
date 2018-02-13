@@ -28,8 +28,8 @@ inline sdbusplus::bus::bus open_system(const char *host = nullptr)
     return sdbusplus::bus::bus(b, std::false_type());
 }
 
-static const std::string prefix = "xyz.openbmc_project.Sensor.Value.Unit.";
-static const int prefix_len = prefix.length();
+const std::string prefix = "xyz.openbmc_project.Sensor.Value.Unit.";
+const int prefix_len = prefix.length();
 
 /**
  * @brief Returns unit shortname by DBus unit name
@@ -39,7 +39,7 @@ static const int prefix_len = prefix.length();
  */
 std::string get_unit_shortname(const std::string& dbus_unit)
 {
-    if ( dbus_unit.substr(0, prefix_len) != prefix )
+    if ( dbus_unit.compare(0, prefix_len, prefix) != 0 )
         return "Unknown";
 
     std::string unit = dbus_unit.substr(prefix_len);
