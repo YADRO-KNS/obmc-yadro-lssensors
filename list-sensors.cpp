@@ -100,7 +100,7 @@ void get_sensor_value(sdbusplus::bus::bus &bus,
     size_t name_pos = s.rfind('/');
     size_t folder_pos = s.rfind('/', name_pos - 1);
 
-    printf("%-12s %-12s ",
+    printf("%-12s %-16s ",
            std::string(sensor + folder_pos + 1, sensor + name_pos).c_str(),
            sensor + name_pos + 1);
 
