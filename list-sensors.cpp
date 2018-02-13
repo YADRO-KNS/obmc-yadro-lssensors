@@ -27,6 +27,37 @@ inline sdbusplus::bus::bus open_system(const char *host = nullptr)
     sd_bus_open_system_remote(&b, host);
     return sdbusplus::bus::bus(b, std::false_type());
 }
+
+/**
+ * @brief Returns unit shortname by DBus unit name
+ *
+ * @param dbus_unit - DBus unut name
+ * @return unit shortname
+ */
+std::string get_unit_shortname(const std::string& dbus_unit)
+{
+    if (dbus_unit.find("Volts") != std::string::npos)
+        return "V";
+
+    else if (dbus_unit.find("DegreesC") != std::string::npos)
+        return "\u00B0C"; // UTF-8 Degrees symbol
+
+    else if (dbus_unit.find("Amperes") != std::string::npos)
+        return "A";
+
+    else if (dbus_unit.find("RPMS") != std::string::npos)
+        return "RPM";
+
+    else if (dbus_unit.find("Watts") != std::string::npos)
+        return "W";
+
+    else if (dbus_unit.find("Joules") != std::string::npos)
+        return "J";
+
+    else
+        return "Unknown";
+}
+
 /**
  * @brief Request sensors values
  *
@@ -67,13 +98,7 @@ void get_sensor_value(sdbusplus::bus::bus &bus,
 
     // --- Show sensors value ---
     s = d["Unit"].get<std::string>();
-    std::string unit;
-    if (s.back() == 'C')
-        unit = "\u00B0C"; // UTF-8 Degrees symbol
-    else if (s.back() == 's')
-        unit = "V";
-    else if (s.back() == 'S')
-        unit = "RPM";
+    std::string unit = get_unit_shortname(s);
 
     float   scale = powf(10, (float)d["Scale"].get<int64_t>());
     int64_t value = d["Value"].get<int64_t>();
