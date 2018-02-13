@@ -28,6 +28,9 @@ inline sdbusplus::bus::bus open_system(const char *host = nullptr)
     return sdbusplus::bus::bus(b, std::false_type());
 }
 
+static const std::string prefix = "xyz.openbmc_project.Sensor.Value.Unit.";
+static const int prefix_len = prefix.length();
+
 /**
  * @brief Returns unit shortname by DBus unit name
  *
@@ -36,22 +39,27 @@ inline sdbusplus::bus::bus open_system(const char *host = nullptr)
  */
 std::string get_unit_shortname(const std::string& dbus_unit)
 {
-    if (dbus_unit.find("Volts") != std::string::npos)
+    if ( dbus_unit.substr(0, prefix_len) != prefix )
+        return "Unknown";
+
+    std::string unit = dbus_unit.substr(prefix_len);
+
+    if ( unit == "Volts" )
         return "V";
 
-    else if (dbus_unit.find("DegreesC") != std::string::npos)
+    else if ( unit == "DegreesC" )
         return "\u00B0C"; // UTF-8 Degrees symbol
 
-    else if (dbus_unit.find("Amperes") != std::string::npos)
+    else if ( unit == "Amperes" )
         return "A";
 
-    else if (dbus_unit.find("RPMS") != std::string::npos)
+    else if ( unit == "RPMS" )
         return "RPM";
 
-    else if (dbus_unit.find("Watts") != std::string::npos)
+    else if ( unit == "Watts" )
         return "W";
 
-    else if (dbus_unit.find("Joules") != std::string::npos)
+    else if ( unit == "Joules" )
         return "J";
 
     else
