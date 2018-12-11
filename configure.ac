@@ -8,17 +8,15 @@ AM_SILENT_RULES([yes])
 AC_PROG_CXX
 AC_PROG_MAKE_SET
 
+# Checks for libraries.
+PKG_CHECK_MODULES([SDBUSPLUS], [sdbusplus], [], [], [AC_MSG_ERROR(["Requires sdbusplus package."])])
+
 # Checks for typedefs, structures, and compiler characteristics.
-AX_CXX_COMPILE_STDCXX_14([noext])
+AX_CXX_COMPILE_STDCXX_17([noext])
 AX_APPEND_COMPILE_FLAGS([-fpic -Wall -Werror], [CXXFLAGS])
 
-# Checks for libraries.
-AX_PKG_CHECK_MODULES([SYSTEMD], [], [libsystemd >= 221], [], [AC_MSG_ERROR(["systemd required and not found."])])
-
-# sdbusplus is non-private because we have no library to link.
-# If we ever have a library, move this to private.
-AX_PKG_CHECK_MODULES([SDBUSPLUS], [sdbusplus], [], [], [AC_MSG_ERROR(["sdbusplus required and not found."])])
-
+# Checks for library functions.
+LT_INIT
+ 
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
-
