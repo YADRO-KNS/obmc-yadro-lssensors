@@ -1,14 +1,14 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdint.h>
-#include <math.h>
 #include <getopt.h>
+#include <unistd.h>
 
-#include <string>
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <sdbusplus/bus.hpp>
 #include <sdbusplus/exception.hpp>
+#include <string>
 
 /**
  * @brief open DBus connection
@@ -17,10 +17,12 @@
  *
  * @return DBus connection object
  */
-inline sdbusplus::bus::bus open_system(const char *host = nullptr)
+inline sdbusplus::bus::bus open_system(const char* host = nullptr)
 {
     if (!host)
+    {
         return sdbusplus::bus::new_system();
+    }
 
     printf("Open DBus session to %s\n", host);
     sd_bus* b = nullptr;
@@ -39,31 +41,39 @@ const int prefix_len = prefix.length();
  */
 std::string get_unit_shortname(const std::string& dbus_unit)
 {
-    if ( dbus_unit.compare(0, prefix_len, prefix) != 0 )
+    if (dbus_unit.compare(0, prefix_len, prefix) != 0)
+    {
         return "Unknown";
+    }
 
     std::string unit = dbus_unit.substr(prefix_len);
 
-    if ( unit == "Volts" )
+    if ("Volts" == unit)
+    {
         return "V";
-
-    else if ( unit == "DegreesC" )
+    }
+    else if ("DegreesC" == unit)
+    {
         return "\u00B0C"; // UTF-8 Degrees symbol
-
-    else if ( unit == "Amperes" )
+    }
+    else if ("Amperes" == unit)
+    {
         return "A";
-
-    else if ( unit == "RPMS" )
+    }
+    else if ("RPMS" == unit)
+    {
         return "RPM";
-
-    else if ( unit == "Watts" )
+    }
+    else if ("Watts" == unit)
+    {
         return "W";
-
-    else if ( unit == "Joules" )
+    }
+    else if ("Joules" == unit)
+    {
         return "J";
+    }
 
-    else
-        return "Unknown";
+    return "Unknown";
 }
 
 /**
@@ -73,14 +83,12 @@ std::string get_unit_shortname(const std::string& dbus_unit)
  * @param device - DBus targer who containt sensor
  * @param sensor - Sensors path
  */
-void get_sensor_value(sdbusplus::bus::bus &bus,
-                      const char *device, const char *sensor)
+void get_sensor_value(sdbusplus::bus::bus& bus, const char* device,
+                      const char* sensor)
 {
     // --- Ask DBus for all sensors properties
-    auto m = bus.new_method_call(device,
-                                 sensor,
-                                 "org.freedesktop.DBus.Properties",
-                                 "GetAll");
+    auto m = bus.new_method_call(device, sensor,
+                                 "org.freedesktop.DBus.Properties", "GetAll");
     // NOTE: For this tool may be limited.
     //       For real ALL properties may be requested with empty string.
     m.append("xyz.openbmc_project.Sensor.Value");
@@ -110,13 +118,17 @@ void get_sensor_value(sdbusplus::bus::bus &bus,
     s = vns::get<std::string>(d["Unit"]);
     std::string unit = get_unit_shortname(s);
 
-    float   scale = powf(10, static_cast<float>(vns::get<int64_t>(d["Scale"])));
+    float scale = powf(10, static_cast<float>(vns::get<int64_t>(d["Scale"])));
     int64_t value = vns::get<int64_t>(d["Value"]);
 
     if (scale < 1.f)
+    {
         printf("%10.03f %s ", value * scale, unit.c_str());
+    }
     else
+    {
         printf("%10d %s ", (int)(value * scale), unit.c_str());
+    }
 
     // --- End of line ---
     printf("\n");
@@ -127,7 +139,7 @@ void get_sensor_value(sdbusplus::bus::bus &bus,
  */
 struct cmp_sensors_name
 {
-    bool operator()(const std::string &a, const std::string &b) const
+    bool operator()(const std::string& a, const std::string& b) const
     {
         size_t ia = a.find_last_not_of("0123456789") + 1;
         size_t ib = b.find_last_not_of("0123456789") + 1;
@@ -136,7 +148,9 @@ struct cmp_sensors_name
         {
             int r = a.compare(0, ia, b.substr(0, ib));
             if (0 == r)
+            {
                 return std::stoi(a.substr(ia)) < std::stoi(b.substr(ib));
+            }
             return r < 0;
         }
         return a < b;
@@ -149,17 +163,14 @@ typedef std::map<std::string, std::string, cmp_sensors_name> sensors_t;
  *
  * @return
  */
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-    const char * host     = nullptr;
-    bool         showhelp = false;
-    const struct option opts[] = {
-        { "host", required_argument, nullptr, 'H'  },
-        { "help",   no_argument,     nullptr, 'h'  },
-
-        // --- end of array ---
-        { nullptr,  0,                 nullptr, '\0' }
-    };
+    const char* host = nullptr;
+    bool showhelp = false;
+    const struct option opts[] = {{"host", required_argument, nullptr, 'H'},
+                                  {"help", no_argument, nullptr, 'h'},
+                                  // --- end of array ---
+                                  {nullptr, 0, nullptr, '\0'}};
 
     int c;
     while ((c = getopt_long(argc, argv, "H:h", opts, nullptr)) != -1)
@@ -168,14 +179,19 @@ int main(int argc, char *argv[])
         {
             case 'H':
                 if (optarg)
+                {
                     host = optarg;
+                }
                 else
                 {
                     fprintf(stderr, "Remote host required with this option!\n");
                     showhelp = true;
                 }
                 break;
-            case 'h': showhelp = true; break;
+
+            case 'h':
+                showhelp = true;
+                break;
             default:
                 fprintf(stderr, "Unknown option found '%c'!\n", c);
                 showhelp = true;
@@ -194,12 +210,13 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    auto bus    = open_system(host);
-    auto method = bus.new_method_call("xyz.openbmc_project.ObjectMapper",
-                                      "/xyz/openbmc_project/object_mapper",
-                                      "xyz.openbmc_project.ObjectMapper",
-                                      "GetSubTree");
-    method.append("/xyz/openbmc_project/sensors", 5, std::vector<std::string>());
+    auto bus = open_system(host);
+    auto method =
+        bus.new_method_call("xyz.openbmc_project.ObjectMapper",
+                            "/xyz/openbmc_project/object_mapper",
+                            "xyz.openbmc_project.ObjectMapper", "GetSubTree");
+    method.append("/xyz/openbmc_project/sensors", 5,
+                  std::vector<std::string>());
 
     auto reply = bus.call(method);
     if (reply.is_method_error())
@@ -209,17 +226,21 @@ int main(int argc, char *argv[])
     }
 
     // NOTE: sdbusplus do not allowing std::map with custom predicate
-    std::map<std::string, std::map<std::string, std::vector<std::string> > > data;
+    std::map<std::string, std::map<std::string, std::vector<std::string>>> data;
     reply.read(data);
 
     // --- Using sorted py path with nums order ---
-    std::map<std::string, std::map<std::string, std::vector<std::string> >, cmp_sensors_name> sorted_data;
+    std::map<std::string, std::map<std::string, std::vector<std::string>>,
+             cmp_sensors_name>
+        sorted_data;
     sorted_data.insert(data.begin(), data.end());
 
     for (auto p = sorted_data.begin(); p != sorted_data.end(); ++p)
     {
         for (auto d = p->second.begin(); d != p->second.end(); ++d)
+        {
             get_sensor_value(bus, d->first.c_str(), p->first.c_str());
+        }
     }
 
     return EXIT_SUCCESS;
