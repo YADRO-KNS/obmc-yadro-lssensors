@@ -215,8 +215,9 @@ int main(int argc, char* argv[])
         bus.new_method_call("xyz.openbmc_project.ObjectMapper",
                             "/xyz/openbmc_project/object_mapper",
                             "xyz.openbmc_project.ObjectMapper", "GetSubTree");
-    method.append("/xyz/openbmc_project/sensors", 5,
-                  std::vector<std::string>());
+    const std::vector<std::string> ifaces = {
+        "xyz.openbmc_project.Sensor.Value"};
+    method.append("/xyz/openbmc_project/sensors", 0, ifaces);
 
     auto reply = bus.call(method);
     if (reply.is_method_error())
