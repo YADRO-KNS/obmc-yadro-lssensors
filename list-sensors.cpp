@@ -92,7 +92,9 @@ void get_sensor_value(sdbusplus::bus::bus &bus,
         return;
     }
 
-    std::map<std::string, sdbusplus::message::variant<std::string, int64_t, bool> > d;
+    namespace vns = sdbusplus::message::variant_ns;
+    using Property = vns::variant<std::string, int64_t, bool>;
+    std::map<std::string, Property> d;
     r.read(d);
 
     // --- Show sensors folder and name ---
@@ -105,11 +107,11 @@ void get_sensor_value(sdbusplus::bus::bus &bus,
            sensor + name_pos + 1);
 
     // --- Show sensors value ---
-    s = d["Unit"].get<std::string>();
+    s = vns::get<std::string>(d["Unit"]);
     std::string unit = get_unit_shortname(s);
 
-    float   scale = powf(10, (float)d["Scale"].get<int64_t>());
-    int64_t value = d["Value"].get<int64_t>();
+    float   scale = powf(10, static_cast<float>(vns::get<int64_t>(d["Scale"])));
+    int64_t value = vns::get<int64_t>(d["Value"]);
 
     if (scale < 1.f)
         printf("%10.03f %s ", value * scale, unit.c_str());
