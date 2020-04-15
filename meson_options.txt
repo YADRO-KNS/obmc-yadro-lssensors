@@ -15,3 +15,6 @@ option('sensors-path', type: 'string', value: '/xyz/openbmc_project/sensors',
 option('sensor-value-iface', type: 'string',
        value: 'xyz.openbmc_project.Sensor.Value',
        description: 'The sensor value interface')
+
+option('remote-host-support', type: 'boolean', value: false,
+       description: 'Enable support for remote hosts asking')
