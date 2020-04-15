@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <getopt.h>
 #include <unistd.h>
 
@@ -87,11 +89,10 @@ void get_sensor_value(sdbusplus::bus::bus& bus, const char* device,
                       const char* sensor)
 {
     // --- Ask DBus for all sensors properties
-    auto m = bus.new_method_call(device, sensor,
-                                 "org.freedesktop.DBus.Properties", "GetAll");
+    auto m = bus.new_method_call(device, sensor, SYSTEMD_PROPERTIES, "GetAll");
     // NOTE: For this tool may be limited.
     //       For real ALL properties may be requested with empty string.
-    m.append("xyz.openbmc_project.Sensor.Value");
+    m.append(SENSOR_VALUE_IFACE);
     auto r = bus.call(m);
 
     if (r.is_method_error())
@@ -211,13 +212,10 @@ int main(int argc, char* argv[])
     }
 
     auto bus = open_system(host);
-    auto method =
-        bus.new_method_call("xyz.openbmc_project.ObjectMapper",
-                            "/xyz/openbmc_project/object_mapper",
-                            "xyz.openbmc_project.ObjectMapper", "GetSubTree");
-    const std::vector<std::string> ifaces = {
-        "xyz.openbmc_project.Sensor.Value"};
-    method.append("/xyz/openbmc_project/sensors", 0, ifaces);
+    auto method = bus.new_method_call(MAPPER_BUS, MAPPER_PATH, MAPPER_IFACE,
+                                      "GetSubTree");
+    const std::vector<std::string> ifaces = {SENSOR_VALUE_IFACE};
+    method.append(SENSORS_PATH, 0, ifaces);
 
     auto reply = bus.call(method);
     if (reply.is_method_error())
