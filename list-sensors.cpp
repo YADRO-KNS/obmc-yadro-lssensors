@@ -196,7 +196,9 @@ int main(int argc, char* argv[])
     if (showhelp)
     {
         fprintf(stderr,
-                "Usage: %s [options]\n"
+                "Usage: %s [options] [sensors-type]\n"
+                "  Shows all sensors of the specified type.\n"
+                "  If the type is not specified shows all found sensors.\n"
                 "Options:\n"
 #ifdef WITH_REMOTE_HOST
                 "  -H, --host=[USER@]HOST   Operate on remote host (over ssh)\n"
@@ -216,10 +218,17 @@ int main(int argc, char* argv[])
     }
 #endif
 
+    std::string root_path = SENSORS_PATH;
+    if (optind < argc)
+    {
+        root_path += "/";
+        root_path += argv[optind];
+    }
+
     auto method = systemBus.new_method_call(MAPPER_BUS, MAPPER_PATH,
                                             MAPPER_IFACE, "GetSubTree");
     const std::vector<std::string> ifaces = {SENSOR_VALUE_IFACE};
-    method.append(SENSORS_PATH, 0, ifaces);
+    method.append(root_path, 0, ifaces);
 
     auto reply = systemBus.call(method);
     if (reply.is_method_error())
