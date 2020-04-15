@@ -1,0 +1,17 @@
+option('mapper-bus', type: 'string',
+       value: 'xyz.openbmc_project.ObjectMapper',
+       description: 'The object mapper busname.')
+option('mapper-path', type: 'string',
+       value: '/xyz/openbmc_project/object_mapper',
+       description: 'The object mapper object path.')
+option('mapper-iface', type: 'string',
+       value: 'xyz.openbmc_project.ObjectMapper',
+       description: 'The object mapper interface.')
+option('systemd-properties', type: 'string',
+       value: 'org.freedesktop.DBus.Properties',
+       description: 'The systemd properties interface.')
+option('sensors-path', type: 'string', value: '/xyz/openbmc_project/sensors',
+       description: 'The sensors object root path')
+option('sensor-value-iface', type: 'string',
+       value: 'xyz.openbmc_project.Sensor.Value',
+       description: 'The sensor value interface')

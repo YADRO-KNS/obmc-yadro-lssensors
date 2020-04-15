@@ -8,6 +8,17 @@ project('list-sensors', 'cpp',
     version: '2.0',
 )
 
+conf = configuration_data()
+
+conf.set_quoted('MAPPER_BUS', get_option('mapper-bus'))
+conf.set_quoted('MAPPER_PATH', get_option('mapper-path'))
+conf.set_quoted('MAPPER_IFACE', get_option('mapper-iface'))
+conf.set_quoted('SYSTEMD_PROPERTIES', get_option('systemd-properties'))
+conf.set_quoted('SENSORS_PATH', get_option('sensors-path'))
+conf.set_quoted('SENSOR_VALUE_IFACE', get_option('sensor-value-iface'))
+
+configure_file(output: 'config.h', configuration: conf)
+
 executable('lssensors',
     'list-sensors.cpp',
     dependencies: [
