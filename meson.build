@@ -17,6 +17,8 @@ conf.set_quoted('SYSTEMD_PROPERTIES', get_option('systemd-properties'))
 conf.set_quoted('SENSORS_PATH', get_option('sensors-path'))
 conf.set_quoted('SENSOR_VALUE_IFACE', get_option('sensor-value-iface'))
 
+conf.set('WITH_REMOTE_HOST', get_option('remote-host-support'))
+
 configure_file(output: 'config.h', configuration: conf)
 
 executable('lssensors',

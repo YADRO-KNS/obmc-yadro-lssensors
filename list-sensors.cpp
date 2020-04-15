@@ -12,25 +12,8 @@
 #include <sdbusplus/exception.hpp>
 #include <string>
 
-/**
- * @brief open DBus connection
- *
- * @param host - remote host
- *
- * @return DBus connection object
- */
-inline sdbusplus::bus::bus open_system(const char* host = nullptr)
-{
-    if (!host)
-    {
-        return sdbusplus::bus::new_system();
-    }
-
-    printf("Open DBus session to %s\n", host);
-    sd_bus* b = nullptr;
-    sd_bus_open_system_remote(&b, host);
-    return sdbusplus::bus::bus(b, std::false_type());
-}
+// Bus handler singleton
+static sdbusplus::bus::bus systemBus = sdbusplus::bus::new_default();
 
 const std::string prefix = "xyz.openbmc_project.Sensor.Value.Unit.";
 const int prefix_len = prefix.length();
@@ -81,23 +64,22 @@ std::string get_unit_shortname(const std::string& dbus_unit)
 /**
  * @brief Request sensors values
  *
- * @param bus    - DBus connection object
- * @param device - DBus targer who containt sensor
- * @param sensor - Sensors path
+ * @param busname - Sensor's object bus name
+ * @param path - Sensor's object path
  */
-void get_sensor_value(sdbusplus::bus::bus& bus, const char* device,
-                      const char* sensor)
+void get_sensor_value(const char* busname, const char* path)
 {
     // --- Ask DBus for all sensors properties
-    auto m = bus.new_method_call(device, sensor, SYSTEMD_PROPERTIES, "GetAll");
+    auto m =
+        systemBus.new_method_call(busname, path, SYSTEMD_PROPERTIES, "GetAll");
     // NOTE: For this tool may be limited.
     //       For real ALL properties may be requested with empty string.
     m.append(SENSOR_VALUE_IFACE);
-    auto r = bus.call(m);
+    auto r = systemBus.call(m);
 
     if (r.is_method_error())
     {
-        fprintf(stderr, "Get properties for %s failed\n", sensor);
+        fprintf(stderr, "Get properties for %s failed\n", path);
         return;
     }
 
@@ -107,13 +89,13 @@ void get_sensor_value(sdbusplus::bus::bus& bus, const char* device,
     r.read(d);
 
     // --- Show sensors folder and name ---
-    std::string s = sensor;
+    std::string s = path;
     size_t name_pos = s.rfind('/');
     size_t folder_pos = s.rfind('/', name_pos - 1);
 
     printf("%-12s %-16s ",
-           std::string(sensor + folder_pos + 1, sensor + name_pos).c_str(),
-           sensor + name_pos + 1);
+           std::string(path + folder_pos + 1, path + name_pos).c_str(),
+           path + name_pos + 1);
 
     // --- Show sensors value ---
     s = vns::get<std::string>(d["Unit"]);
@@ -142,8 +124,9 @@ struct cmp_sensors_name
 {
     bool operator()(const std::string& a, const std::string& b) const
     {
-        size_t ia = a.find_last_not_of("0123456789") + 1;
-        size_t ib = b.find_last_not_of("0123456789") + 1;
+        constexpr auto digits = "0123456789";
+        size_t ia = a.find_last_not_of(digits) + 1;
+        size_t ib = b.find_last_not_of(digits) + 1;
 
         if (ia == ib && ia < a.length() && ib < b.length())
         {
@@ -166,18 +149,28 @@ typedef std::map<std::string, std::string, cmp_sensors_name> sensors_t;
  */
 int main(int argc, char* argv[])
 {
+#ifdef WITH_REMOTE_HOST
     const char* host = nullptr;
+#endif
     bool showhelp = false;
-    const struct option opts[] = {{"host", required_argument, nullptr, 'H'},
-                                  {"help", no_argument, nullptr, 'h'},
-                                  // --- end of array ---
-                                  {nullptr, 0, nullptr, '\0'}};
+    const struct option opts[] = {
+#ifdef WITH_REMOTE_HOST
+        {"host", required_argument, nullptr, 'H'},
+#endif
+        {"help", no_argument, nullptr, 'h'},
+        // --- end of array ---
+        {nullptr, 0, nullptr, '\0'}};
 
     int c;
+#ifdef WITH_REMOTE_HOST
     while ((c = getopt_long(argc, argv, "H:h", opts, nullptr)) != -1)
+#else
+    while ((c = getopt_long(argc, argv, "h", opts, nullptr)) != -1)
+#endif
     {
         switch (c)
         {
+#ifdef WITH_REMOTE_HOST
             case 'H':
                 if (optarg)
                 {
@@ -189,7 +182,7 @@ int main(int argc, char* argv[])
                     showhelp = true;
                 }
                 break;
-
+#endif
             case 'h':
                 showhelp = true;
                 break;
@@ -205,19 +198,30 @@ int main(int argc, char* argv[])
         fprintf(stderr,
                 "Usage: %s [options]\n"
                 "Options:\n"
+#ifdef WITH_REMOTE_HOST
                 "  -H, --host=[USER@]HOST   Operate on remote host (over ssh)\n"
+#endif
                 "  -h, --help               Show this help\n",
                 argv[0]);
         return EXIT_FAILURE;
     }
 
-    auto bus = open_system(host);
-    auto method = bus.new_method_call(MAPPER_BUS, MAPPER_PATH, MAPPER_IFACE,
-                                      "GetSubTree");
+#ifdef WITH_REMOTE_HOST
+    if (host)
+    {
+        printf("Open DBus session to %s\n", host);
+        sd_bus* b = nullptr;
+        sd_bus_open_system_remote(&b, host);
+        systemBus = sdbusplus::bus::bus(b, std::false_type());
+    }
+#endif
+
+    auto method = systemBus.new_method_call(MAPPER_BUS, MAPPER_PATH,
+                                            MAPPER_IFACE, "GetSubTree");
     const std::vector<std::string> ifaces = {SENSOR_VALUE_IFACE};
     method.append(SENSORS_PATH, 0, ifaces);
 
-    auto reply = bus.call(method);
+    auto reply = systemBus.call(method);
     if (reply.is_method_error())
     {
         fprintf(stderr, "Call GetSubTree() failed\n");
@@ -238,7 +242,7 @@ int main(int argc, char* argv[])
     {
         for (auto d = p->second.begin(); d != p->second.end(); ++d)
         {
-            get_sensor_value(bus, d->first.c_str(), p->first.c_str());
+            get_sensor_value(d->first.c_str(), p->first.c_str());
         }
     }
 
