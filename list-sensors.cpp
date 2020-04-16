@@ -15,106 +15,216 @@
 // Bus handler singleton
 static sdbusplus::bus::bus systemBus = sdbusplus::bus::new_default();
 
-const std::string prefix = "xyz.openbmc_project.Sensor.Value.Unit.";
-const int prefix_len = prefix.length();
+using PropertyValue = std::variant<int64_t, std::string, bool>;
+using PropertyName = std::string;
+using PropertiesMap = std::map<PropertyName, PropertyValue>;
 
 /**
- * @brief Returns unit shortname by DBus unit name
- *
- * @param dbus_unit - DBus unut name
- * @return unit shortname
+ * @brief Gives a simple access to sensor properties.
  */
-std::string get_unit_shortname(const std::string& dbus_unit)
+class Properties : public PropertiesMap
 {
-    if (dbus_unit.compare(0, prefix_len, prefix) != 0)
+  public:
+    using PropertiesMap::PropertiesMap;
+
+    /**
+     * @brief Check is specified alarm property has true value
+     *
+     * @param name - Proprety name
+     */
+    bool isAlarmed(const PropertyName& name) const
     {
-        return "Unknown";
+        auto it = this->find(name);
+        return (it == this->end() ? false : std::get<bool>(it->second));
     }
 
-    std::string unit = dbus_unit.substr(prefix_len);
+    /**
+     * @brief Current sensor state
+     */
+    std::string status() const
+    {
+        std::string ret = "OK";
+        if (isAlarmed("CriticalAlarmLow") || isAlarmed("CriticalAlarmHigh"))
+        {
+            ret = "Critcal";
+        }
+        else if (isAlarmed("WarningAlarmLow") || isAlarmed("WarningAlarmHigh"))
+        {
+            ret = "Warning";
+        }
 
-    if ("Volts" == unit)
-    {
-        return "V";
-    }
-    else if ("DegreesC" == unit)
-    {
-        return "\u00B0C"; // UTF-8 Degrees symbol
-    }
-    else if ("Amperes" == unit)
-    {
-        return "A";
-    }
-    else if ("RPMS" == unit)
-    {
-        return "RPM";
-    }
-    else if ("Watts" == unit)
-    {
-        return "W";
-    }
-    else if ("Joules" == unit)
-    {
-        return "J";
+        return ret;
     }
 
-    return "Unknown";
-}
+    /**
+     * @brief Sensor's scale factor
+     */
+    float scale() const
+    {
+        float ret = 1.f;
+        auto it = this->find("Scale");
+        if (it != this->end())
+        {
+            auto value = std::get<int64_t>(it->second);
+            ret = powf(10, static_cast<float>(value));
+        }
+        return ret;
+    }
+
+    /**
+     * @brief Format a sensor value or threshold
+     *
+     * @param name - Proprety name
+     *
+     * @return String with formated value of property
+     */
+    std::string get_prop_value(const PropertyName& name) const
+    {
+        std::string ret(9, '\0');
+        auto it = this->find(name);
+        if (it == this->end())
+        {
+            ret = "N/A";
+        }
+        else
+        {
+            auto _scale = scale();
+            auto _value = std::get<int64_t>(it->second);
+            if (_scale < 1.f)
+            {
+                snprintf(ret.data(), ret.size(), "%8.03f", _value * _scale);
+            }
+            else
+            {
+                snprintf(ret.data(), ret.size(), "%8d", (int)(_value * _scale));
+            }
+        }
+
+        return ret;
+    }
+
+    std::string value() const
+    {
+        return get_prop_value("Value");
+    }
+    std::string criticalLow() const
+    {
+        return get_prop_value("CriticalLow");
+    }
+    std::string criticalHigh() const
+    {
+        return get_prop_value("CriticalHigh");
+    }
+    std::string warningLow() const
+    {
+        return get_prop_value("CriticalLow");
+    }
+    std::string warningHigh() const
+    {
+        return get_prop_value("CriticalHigh");
+    }
+
+    /**
+     * @brief Short sensors unit name
+     */
+    std::string unit() const
+    {
+        std::string ret;
+
+        auto it = this->find("Unit");
+        if (it != this->end())
+        {
+            auto _unit = std::get<std::string>(it->second);
+            _unit = _unit.substr(_unit.rfind('.') + 1);
+
+            if ("Volts" == _unit)
+            {
+                ret = "V";
+            }
+            else if ("DegreesC" == _unit)
+            {
+                ret = "\u00B0C"; // UTF-8 Degrees symbol
+            }
+            else if ("Amperes" == _unit)
+            {
+                ret = "A";
+            }
+            else if ("RPMS" == _unit)
+            {
+                ret = "RPM";
+            }
+            else if ("Watts" == _unit)
+            {
+                ret = "W";
+            }
+            else if ("Joules" == _unit)
+            {
+                ret = "J";
+            }
+            else
+            {
+                ret = _unit;
+            }
+        }
+
+        return ret;
+    }
+};
 
 /**
- * @brief Request sensors values
+ * @brief Show sensor's data
  *
  * @param busname - Sensor's object bus name
  * @param path - Sensor's object path
  */
-void get_sensor_value(const char* busname, const char* path)
+void print_sensor_data(const std::string& busname, const std::string& path)
 {
-    // --- Ask DBus for all sensors properties
-    auto m =
-        systemBus.new_method_call(busname, path, SYSTEMD_PROPERTIES, "GetAll");
-    // NOTE: For this tool may be limited.
-    //       For real ALL properties may be requested with empty string.
-    m.append(SENSOR_VALUE_IFACE);
+    // Ask DBus for all sensors properties
+    auto m = systemBus.new_method_call(busname.c_str(), path.c_str(),
+                                       SYSTEMD_PROPERTIES, "GetAll");
+    m.append("");
     auto r = systemBus.call(m);
 
     if (r.is_method_error())
     {
-        fprintf(stderr, "Get properties for %s failed\n", path);
+        fprintf(stderr, "Get properties for %s failed\n", path.c_str());
         return;
     }
 
-    namespace vns = sdbusplus::message::variant_ns;
-    using Property = vns::variant<std::string, int64_t, bool>;
-    std::map<std::string, Property> d;
-    r.read(d);
+    Properties props;
+    r.read(props);
 
-    // --- Show sensors folder and name ---
-    std::string s = path;
-    size_t name_pos = s.rfind('/');
-    size_t folder_pos = s.rfind('/', name_pos - 1);
+    size_t name_pos = path.rfind('/');
+    size_t folder_pos = path.rfind('/', name_pos - 1);
 
-    printf("%-12s %-16s ",
-           std::string(path + folder_pos + 1, path + name_pos).c_str(),
-           path + name_pos + 1);
+    // row format string
+    constexpr auto row_fmt = " %-18s %8s %8s %-4s\t%8s %8s %8s %8s\n";
 
-    // --- Show sensors value ---
-    s = vns::get<std::string>(d["Unit"]);
-    std::string unit = get_unit_shortname(s);
+    // Show group header if it is a new type
+    static std::string typeName;
 
-    float scale = powf(10, static_cast<float>(vns::get<int64_t>(d["Scale"])));
-    int64_t value = vns::get<int64_t>(d["Value"]);
-
-    if (scale < 1.f)
+    std::string currentType =
+        path.substr(folder_pos + 1, name_pos - folder_pos - 1);
+    if (typeName != currentType)
     {
-        printf("%10.03f %s ", value * scale, unit.c_str());
-    }
-    else
-    {
-        printf("%10d %s ", (int)(value * scale), unit.c_str());
+        if (!typeName.empty())
+        {
+            printf("\n");
+        }
+
+        printf("=== %s ===\n", currentType.c_str());
+        printf(row_fmt, "Name", "Status", "Value", "Unit", "LC", "UC", "LNC",
+               "UNC");
+        printf("\n");
+
+        typeName = currentType;
     }
 
-    // --- End of line ---
-    printf("\n");
+    // Show sensor data
+    printf(row_fmt, path.c_str() + name_pos + 1, props.status().c_str(),
+           props.value().c_str(), props.unit().c_str(),
+           props.criticalLow().c_str(), props.criticalHigh().c_str(),
+           props.warningLow().c_str(), props.warningHigh().c_str());
 }
 
 /**
@@ -140,7 +250,6 @@ struct cmp_sensors_name
         return a < b;
     }
 };
-typedef std::map<std::string, std::string, cmp_sensors_name> sensors_t;
 
 /**
  * @brief Application entry point
@@ -251,7 +360,7 @@ int main(int argc, char* argv[])
     {
         for (auto d = p->second.begin(); d != p->second.end(); ++d)
         {
-            get_sensor_value(d->first.c_str(), p->first.c_str());
+            print_sensor_data(d->first, p->first);
         }
     }
 
