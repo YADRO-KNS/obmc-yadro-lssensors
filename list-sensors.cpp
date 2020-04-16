@@ -339,13 +339,6 @@ int main(int argc, char* argv[])
     const std::vector<std::string> ifaces = {SENSOR_VALUE_IFACE};
     method.append(root_path, 0, ifaces);
 
-    auto reply = systemBus.call(method);
-    if (reply.is_method_error())
-    {
-        fprintf(stderr, "Call GetSubTree() failed\n");
-        return EXIT_FAILURE;
-    }
-
     using Path = std::string;
     using BusName = std::string;
     using Interface = std::string;
@@ -354,7 +347,14 @@ int main(int argc, char* argv[])
     using Objects = std::map<Path, ObjectsMap, cmp_sensors_name>;
 
     Objects objects;
-    reply.read(objects);
+    try
+    {
+        systemBus.call(method).read(objects);
+    }
+    catch (const sdbusplus::exception::SdBusError& ex)
+    {
+        fprintf(stderr, "Error: %s\n", ex.what());
+    }
 
     for (const auto& obj : objects)
     {
