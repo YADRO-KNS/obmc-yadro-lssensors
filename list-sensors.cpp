@@ -361,21 +361,21 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    // NOTE: sdbusplus do not allowing std::map with custom predicate
-    std::map<std::string, std::map<std::string, std::vector<std::string>>> data;
-    reply.read(data);
+    using Path = std::string;
+    using BusName = std::string;
+    using Interface = std::string;
+    using Interfaces = std::vector<Interface>;
+    using ObjectsMap = std::map<BusName, Interfaces>;
+    using Objects = std::map<Path, ObjectsMap, cmp_sensors_name>;
 
-    // --- Using sorted py path with nums order ---
-    std::map<std::string, std::map<std::string, std::vector<std::string>>,
-             cmp_sensors_name>
-        sorted_data;
-    sorted_data.insert(data.begin(), data.end());
+    Objects objects;
+    reply.read(objects);
 
-    for (auto p = sorted_data.begin(); p != sorted_data.end(); ++p)
+    for (const auto& obj : objects)
     {
-        for (auto d = p->second.begin(); d != p->second.end(); ++d)
+        for (const auto& bus : obj.second)
         {
-            printSensorData(d->first, p->first);
+            printSensorData(bus.first, obj.first);
         }
     }
 
