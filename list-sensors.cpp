@@ -239,18 +239,39 @@ struct cmp_sensors_name
     bool operator()(const std::string& a, const std::string& b) const
     {
         constexpr auto digits = "0123456789";
-        size_t ia = a.find_last_not_of(digits) + 1;
-        size_t ib = b.find_last_not_of(digits) + 1;
+        const auto alength = a.length();
+        const auto blength = b.length();
 
-        if (ia == ib && ia < a.length() && ib < b.length())
+        for (size_t aoffset = 0, boffset = 0;
+             aoffset < alength && boffset < blength;)
         {
-            int r = a.compare(0, ia, b.substr(0, ib));
-            if (0 == r)
+            size_t apos = a.find_first_of(digits, aoffset);
+            size_t bpos = b.find_first_of(digits, boffset);
+
+            int result =
+                a.compare(aoffset, apos - aoffset, b, boffset, bpos - boffset);
+            if (0 == result && apos != std::string::npos &&
+                bpos != std::string::npos)
             {
-                return std::stoi(a.substr(ia)) < std::stoi(b.substr(ib));
+                size_t astop = 0;
+                size_t bstop = 0;
+                auto avalue = std::stoi(a.substr(apos), &astop);
+                auto bvalue = std::stoi(b.substr(bpos), &bstop);
+
+                if (avalue != bvalue)
+                {
+                    return avalue < bvalue;
+                }
+
+                aoffset = apos + astop;
+                boffset = bpos + bstop;
             }
-            return r < 0;
+            else
+            {
+                return result < 0;
+            }
         }
+
         return a < b;
     }
 };
