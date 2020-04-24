@@ -234,45 +234,59 @@ void printSensorData(const std::string& busname, const std::string& path)
 /**
  * @brief compare sensors path with numbers
  */
-struct cmp_sensors_name
+struct CmpSensorsName
 {
     bool operator()(const std::string& a, const std::string& b) const
     {
-        constexpr auto digits = "0123456789";
-        const auto alength = a.length();
-        const auto blength = b.length();
-
-        for (size_t aoffset = 0, boffset = 0;
-             aoffset < alength && boffset < blength;)
+        const char* strA = a.c_str();
+        const char* strB = b.c_str();
+        while (true)
         {
-            size_t apos = a.find_first_of(digits, aoffset);
-            size_t bpos = b.find_first_of(digits, boffset);
+            const char& chrA = *strA;
+            const char& chrB = *strB;
 
-            int result =
-                a.compare(aoffset, apos - aoffset, b, boffset, bpos - boffset);
-            if (0 == result && apos != std::string::npos &&
-                bpos != std::string::npos)
+            // check for end of name
+            if (!chrA || !chrB)
             {
-                size_t astop = 0;
-                size_t bstop = 0;
-                auto avalue = std::stoi(a.substr(apos), &astop);
-                auto bvalue = std::stoi(b.substr(bpos), &bstop);
+                return !!chrB;
+            }
 
-                if (avalue != bvalue)
+            const bool isNumA = (chrA >= '0' && chrA <= '9');
+            const bool isNumB = (chrB >= '0' && chrB <= '9');
+
+            if (isNumA && isNumB)
+            {
+                // both names have numbers at the same position
+                char* endA = nullptr;
+                char* endB = nullptr;
+                const unsigned long valA = strtoul(strA, &endA, 10);
+                const unsigned long valB = strtoul(strB, &endB, 10);
+
+                if (valA != valB)
                 {
-                    return avalue < bvalue;
+                    return valA < valB;
                 }
 
-                aoffset = apos + astop;
-                boffset = bpos + bstop;
+                strA = endA;
+                strB = endB;
+            }
+            else if (isNumA || isNumB)
+            {
+                // only one of names has a number
+                return isNumA;
             }
             else
             {
-                return result < 0;
+                // no digits at position
+                if (chrA != chrB)
+                {
+                    return chrA < chrB;
+                }
+
+                ++strA;
+                ++strB;
             }
         }
-
-        return a < b;
     }
 };
 
@@ -380,7 +394,7 @@ int main(int argc, char* argv[])
     using Interface = std::string;
     using Interfaces = std::vector<Interface>;
     using ObjectsMap = std::map<BusName, Interfaces>;
-    using Objects = std::map<Path, ObjectsMap, cmp_sensors_name>;
+    using Objects = std::map<Path, ObjectsMap, CmpSensorsName>;
 
     Objects objects;
     try
