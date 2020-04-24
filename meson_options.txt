@@ -1,20 +1,21 @@
-option('mapper-bus', type: 'string',
+# The Object Mapper
+option('mapper-service', type: 'string',
        value: 'xyz.openbmc_project.ObjectMapper',
-       description: 'The object mapper busname.')
+       description: 'The object mapper service.')
 option('mapper-path', type: 'string',
        value: '/xyz/openbmc_project/object_mapper',
        description: 'The object mapper object path.')
 option('mapper-iface', type: 'string',
        value: 'xyz.openbmc_project.ObjectMapper',
        description: 'The object mapper interface.')
-option('systemd-properties', type: 'string',
-       value: 'org.freedesktop.DBus.Properties',
-       description: 'The systemd properties interface.')
+
+# Hwmon sensors
 option('sensors-path', type: 'string', value: '/xyz/openbmc_project/sensors',
        description: 'The sensors object root path')
 option('sensor-value-iface', type: 'string',
        value: 'xyz.openbmc_project.Sensor.Value',
        description: 'The sensor value interface')
 
+# Useful for debug
 option('remote-host-support', type: 'boolean', value: false,
        description: 'Enable support for remote host querying')

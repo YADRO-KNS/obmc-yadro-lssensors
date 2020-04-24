@@ -1,9 +1,3 @@
-# Python build artifacts
-*.sw*
-__pycache__
-*.pyc
-*.pyo
-
 # Test suite logs
 *.log
 

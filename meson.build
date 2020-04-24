@@ -10,10 +10,9 @@ project('list-sensors', 'cpp',
 
 conf = configuration_data()
 
-conf.set_quoted('MAPPER_BUS', get_option('mapper-bus'))
+conf.set_quoted('MAPPER_SERVICE', get_option('mapper-service'))
 conf.set_quoted('MAPPER_PATH', get_option('mapper-path'))
 conf.set_quoted('MAPPER_IFACE', get_option('mapper-iface'))
-conf.set_quoted('SYSTEMD_PROPERTIES', get_option('systemd-properties'))
 conf.set_quoted('SENSORS_PATH', get_option('sensors-path'))
 conf.set_quoted('SENSOR_VALUE_IFACE', get_option('sensor-value-iface'))
 
