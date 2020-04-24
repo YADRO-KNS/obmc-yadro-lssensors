@@ -234,41 +234,46 @@ struct cmp_sensors_name
 {
     bool operator()(const std::string& a, const std::string& b) const
     {
-        constexpr auto digits = "0123456789";
-        const auto alength = a.length();
-        const auto blength = b.length();
-
-        for (size_t aoffset = 0, boffset = 0;
-             aoffset < alength && boffset < blength;)
+        const char* strA = a.c_str();
+        const char* strB = b.c_str();
+        while (true)
         {
-            size_t apos = a.find_first_of(digits, aoffset);
-            size_t bpos = b.find_first_of(digits, boffset);
+            const char& chrA = *strA;
+            const char& chrB = *strB;
 
-            int result =
-                a.compare(aoffset, apos - aoffset, b, boffset, bpos - boffset);
-            if (0 == result && apos != std::string::npos &&
-                bpos != std::string::npos)
+            // check for end of name
+            if (!chrA || !chrB)
+                return chrB;
+
+            const bool isNumA = (chrA >= '0' && chrA <= '9');
+            const bool isNumB = (chrB >= '0' && chrB <= '9');
+
+            if (isNumA & isNumB)
             {
-                size_t astop = 0;
-                size_t bstop = 0;
-                auto avalue = std::stoi(a.substr(apos), &astop);
-                auto bvalue = std::stoi(b.substr(bpos), &bstop);
-
-                if (avalue != bvalue)
-                {
-                    return avalue < bvalue;
-                }
-
-                aoffset = apos + astop;
-                boffset = bpos + bstop;
+                // both names have numbers at the same position
+                char* endA = nullptr;
+                char* endB = nullptr;
+                const unsigned long valA = strtoul(strA, &endA, 10);
+                const unsigned long valB = strtoul(strB, &endB, 10);
+                if (valA != valB)
+                    return valA < valB;
+                strA = endA;
+                strB = endB;
+            }
+            else if (isNumA ^ isNumB)
+            {
+                // only one of names has a number
+                return isNumB;
             }
             else
             {
-                return result < 0;
+                // no digits at position
+                if (chrA != chrB)
+                    return chrA < chrB;
+                ++strA;
+                ++strB;
             }
         }
-
-        return a < b;
     }
 };
 
