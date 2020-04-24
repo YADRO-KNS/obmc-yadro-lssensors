@@ -19,6 +19,8 @@ using PropertyValue = std::variant<int64_t, std::string, bool>;
 using PropertyName = std::string;
 using PropertiesMap = std::map<PropertyName, PropertyValue>;
 
+static constexpr auto SYSTEMD_PROPERTIES = "org.freedesktop.DBus.Properties";
+
 /**
  * @brief Gives a simple access to sensor properties.
  */
@@ -174,13 +176,13 @@ class Properties : public PropertiesMap
 /**
  * @brief Show sensor's data
  *
- * @param busname - Sensor's object bus name
+ * @param service - Sensor's object service
  * @param path - Sensor's object path
  */
-void print_sensor_data(const std::string& busname, const std::string& path)
+void print_sensor_data(const std::string& service, const std::string& path)
 {
     // Ask DBus for all sensors properties
-    auto m = systemBus.new_method_call(busname.c_str(), path.c_str(),
+    auto m = systemBus.new_method_call(service.c_str(), path.c_str(),
                                        SYSTEMD_PROPERTIES, "GetAll");
     m.append("");
     auto r = systemBus.call(m);
@@ -360,16 +362,16 @@ int main(int argc, char* argv[])
         root_path += argv[optind];
     }
 
-    auto method = systemBus.new_method_call(MAPPER_BUS, MAPPER_PATH,
+    auto method = systemBus.new_method_call(MAPPER_SERVICE, MAPPER_PATH,
                                             MAPPER_IFACE, "GetSubTree");
     const std::vector<std::string> ifaces = {SENSOR_VALUE_IFACE};
     method.append(root_path, 0, ifaces);
 
     using Path = std::string;
-    using BusName = std::string;
+    using Service = std::string;
     using Interface = std::string;
     using Interfaces = std::vector<Interface>;
-    using ObjectsMap = std::map<BusName, Interfaces>;
+    using ObjectsMap = std::map<Service, Interfaces>;
     using Objects = std::map<Path, ObjectsMap, cmp_sensors_name>;
 
     Objects objects;
@@ -384,9 +386,9 @@ int main(int argc, char* argv[])
 
     for (const auto& obj : objects)
     {
-        for (const auto& bus : obj.second)
+        for (const auto& service : obj.second)
         {
-            print_sensor_data(bus.first, obj.first);
+            print_sensor_data(service.first, obj.first);
         }
     }
 
