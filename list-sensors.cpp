@@ -35,7 +35,11 @@ class Properties : public PropertiesMap
     std::string status() const
     {
         std::string ret = "OK";
-        if (getBool("CriticalAlarmLow") || getBool("CriticalAlarmHigh"))
+        if (getBool("FatalAlarmHigh"))
+        {
+            ret = "Fatal";
+        }
+        else if (getBool("CriticalAlarmLow") || getBool("CriticalAlarmHigh"))
         {
             ret = "Critcal";
         }
@@ -81,6 +85,10 @@ class Properties : public PropertiesMap
     std::string warningHigh() const
     {
         return getValue("WarningHigh");
+    }
+    std::string fatalHigh() const
+    {
+        return getValue("FatalHigh");
     }
 
     /**
@@ -153,7 +161,7 @@ class Properties : public PropertiesMap
      */
     std::string getValue(const PropertyName& name) const
     {
-        std::string ret(9, '\0');
+        std::string ret(8, '\0');
         auto it = this->find(name);
         if (it == this->end())
         {
@@ -165,11 +173,11 @@ class Properties : public PropertiesMap
             auto value = std::get<int64_t>(it->second);
             if (factor < 1.f)
             {
-                snprintf(ret.data(), ret.size(), "%8.03f", value * factor);
+                snprintf(ret.data(), ret.size(), "%7.03f", value * factor);
             }
             else
             {
-                snprintf(ret.data(), ret.size(), "%8d", (int)(value * factor));
+                snprintf(ret.data(), ret.size(), "%7d", (int)(value * factor));
             }
         }
 
@@ -204,7 +212,7 @@ void printSensorData(const std::string& service, const std::string& path)
     size_t folder_pos = path.rfind('/', name_pos - 1);
 
     // row format string
-    constexpr auto row_fmt = " %-18s %8s %8s %-4s %8s %8s %8s %8s\n";
+    constexpr auto row_fmt = "%-18s %8s %7s %-4s %7s %7s %7s %7s %7s\n";
 
     // Show group header if it is a new type
     static std::string typeName;
@@ -220,7 +228,7 @@ void printSensorData(const std::string& service, const std::string& path)
 
         printf("=== %s ===\n", currentType.c_str());
         printf(row_fmt, "Name", "Status", "Value", "Unit", "LC", "LNC", "UNC",
-               "UC");
+               "UC", "NR");
         printf("\n");
 
         typeName = currentType;
@@ -230,7 +238,8 @@ void printSensorData(const std::string& service, const std::string& path)
     printf(row_fmt, path.c_str() + name_pos + 1, props.status().c_str(),
            props.value().c_str(), props.unit().c_str(),
            props.criticalLow().c_str(), props.warningLow().c_str(),
-           props.warningHigh().c_str(), props.criticalHigh().c_str());
+           props.warningHigh().c_str(), props.criticalHigh().c_str(),
+           props.fatalHigh().c_str());
 }
 
 /**
