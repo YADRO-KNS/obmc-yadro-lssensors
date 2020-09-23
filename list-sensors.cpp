@@ -15,7 +15,7 @@
 // Bus handler singleton
 static sdbusplus::bus::bus systemBus = sdbusplus::bus::new_default();
 
-using PropertyValue = std::variant<int64_t, std::string, bool>;
+using PropertyValue = std::variant<int64_t, std::string, bool, double>;
 using PropertyName = std::string;
 using PropertiesMap = std::map<PropertyName, PropertyValue>;
 
@@ -166,6 +166,18 @@ class Properties : public PropertiesMap
         if (it == this->end())
         {
             ret = "N/A";
+        }
+        else if (std::holds_alternative<double>(it->second))
+        {
+            auto value = std::get<double>(it->second);
+            if (value < 1000)
+            {
+                snprintf(ret.data(), ret.size(), "%7.03f", value);
+            }
+            else
+            {
+                snprintf(ret.data(), ret.size(), "%7d", (int)(value));
+            }
         }
         else
         {
