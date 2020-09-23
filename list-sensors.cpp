@@ -131,6 +131,14 @@ class Properties : public PropertiesMap
             {
                 ret = "J";
             }
+            else if ("Meters" == name)
+            {
+                ret = "m";
+            }
+            else if ("Percent" == name)
+            {
+                ret = "%";
+            }
             else
             {
                 ret = name;
