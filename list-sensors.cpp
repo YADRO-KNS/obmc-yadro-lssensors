@@ -68,6 +68,17 @@ class Properties : public PropertiesMap
 
     std::string value() const
     {
+        auto it = this->find("Functional");
+        if (it != this->end() && std::get<bool>(it->second) == false)
+        {
+            return "FAIL";
+        }
+        it = this->find("Available");
+        if (it != this->end() && std::get<bool>(it->second) == false)
+        {
+            return "N/A";
+        }
+
         return getValue("Value");
     }
     std::string criticalLow() const
@@ -178,7 +189,11 @@ class Properties : public PropertiesMap
         else if (std::holds_alternative<double>(it->second))
         {
             auto value = std::get<double>(it->second);
-            if (value < 1000)
+            if (std::isnan(value))
+            {
+                ret = "N/A";
+            }
+            else if (value < 1000)
             {
                 snprintf(ret.data(), ret.size(), "%7.03f", value);
             }
