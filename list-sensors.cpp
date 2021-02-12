@@ -30,22 +30,45 @@ class Properties : public PropertiesMap
     using PropertiesMap::PropertiesMap;
 
     /**
+     * @brief Check if sensor Available and Functional
+     */
+    std::string functional() const
+    {
+        std::string ret = "OK";
+        auto it = this->find("Functional");
+        if (it != this->end() && std::get<bool>(it->second) == false)
+        {
+            ret = "FAIL";
+        }
+        it = this->find("Available");
+        if (it != this->end() && std::get<bool>(it->second) == false)
+        {
+            ret = "N/A";
+        }
+
+        return ret;
+    }
+
+    /**
      * @brief Current sensor state
      */
     std::string status() const
     {
-        std::string ret = "OK";
-        if (getBool("FatalAlarmHigh"))
+        std::string ret = functional();
+        if ("OK" == ret)
         {
-            ret = "Fatal";
-        }
-        else if (getBool("CriticalAlarmLow") || getBool("CriticalAlarmHigh"))
-        {
-            ret = "Critcal";
-        }
-        else if (getBool("WarningAlarmLow") || getBool("WarningAlarmHigh"))
-        {
-            ret = "Warning";
+            if (getBool("FatalAlarmHigh"))
+            {
+                ret = "Fatal";
+            }
+            else if (getBool("CriticalAlarmLow") || getBool("CriticalAlarmHigh"))
+            {
+                ret = "Critical";
+            }
+            else if (getBool("WarningAlarmLow") || getBool("WarningAlarmHigh"))
+            {
+                ret = "Warning";
+            }
         }
 
         return ret;
@@ -68,17 +91,10 @@ class Properties : public PropertiesMap
 
     std::string value() const
     {
-        auto it = this->find("Functional");
-        if (it != this->end() && std::get<bool>(it->second) == false)
-        {
-            return "FAIL";
-        }
-        it = this->find("Available");
-        if (it != this->end() && std::get<bool>(it->second) == false)
+        if ("OK" != functional())
         {
             return "N/A";
         }
-
         return getValue("Value");
     }
     std::string criticalLow() const
@@ -163,7 +179,7 @@ class Properties : public PropertiesMap
     /**
      * @brief Check is the specified boolean property has true value
      *
-     * @param name - Proprety name
+     * @param name - Property name
      */
     bool getBool(const PropertyName& name) const
     {
@@ -174,9 +190,9 @@ class Properties : public PropertiesMap
     /**
      * @brief Format a sensor value or threshold
      *
-     * @param name - Proprety name
+     * @param name - Property name
      *
-     * @return String with formated value of property
+     * @return String with formatted value of property
      */
     std::string getValue(const PropertyName& name) const
     {
