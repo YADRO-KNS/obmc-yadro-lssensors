@@ -26,4 +26,5 @@ executable('lssensors',
         dependency('sdbusplus'),
     ],
     install: true,
+    install_dir: get_option('sbindir'),
 )
