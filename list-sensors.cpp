@@ -355,6 +355,43 @@ struct CmpSensorsName
 };
 
 /**
+ * @brief Prints the application usage help
+ *
+ * @return EXIT_FAILURE
+ */
+static int usage(char *progname, bool cli_mode)
+{
+    if (cli_mode)
+    {
+        fprintf(stderr,
+                "Sensor readings\n"
+                "  [TYPE] - An optional type of sensors to list\n"
+                "           Availaible types are:\n"
+                "             voltage\n"
+                "             current\n"
+                "             power\n"
+                "             temperature\n"
+                "             fan_pwm\n"
+                "             fan_tach\n");
+    }
+    else
+    {
+        fprintf(stderr,
+                "Usage: %s [options] [sensors-type]\n"
+                "  Shows all sensors of the specified type.\n"
+                "  If the type is not specified shows all found sensors.\n"
+                "Options:\n"
+#ifdef WITH_REMOTE_HOST
+                "  -H, --host=[USER@]HOST   Operate on remote host (over ssh)\n"
+#endif
+                "  -c, --cli                CLI mode for obmc-yadro-cli\n",
+                "  -h, --help               Show this help\n",
+                progname);
+    }
+    return EXIT_FAILURE;
+}
+
+/**
  * @brief Application entry point
  *
  * @return
@@ -365,19 +402,21 @@ int main(int argc, char* argv[])
     const char* host = nullptr;
 #endif
     bool showhelp = false;
+    bool cli_mode = false;
     const struct option opts[] = {
 #ifdef WITH_REMOTE_HOST
         {"host", required_argument, nullptr, 'H'},
 #endif
+        {"cli", no_argument, nullptr, 'c'},
         {"help", no_argument, nullptr, 'h'},
         // --- end of array ---
         {nullptr, 0, nullptr, '\0'}};
 
     int c;
 #ifdef WITH_REMOTE_HOST
-    while ((c = getopt_long(argc, argv, "H:h", opts, nullptr)) != -1)
+    while ((c = getopt_long(argc, argv, "H:hc", opts, nullptr)) != -1)
 #else
-    while ((c = getopt_long(argc, argv, "h", opts, nullptr)) != -1)
+    while ((c = getopt_long(argc, argv, "hc", opts, nullptr)) != -1)
 #endif
     {
         switch (c)
@@ -395,6 +434,9 @@ int main(int argc, char* argv[])
                 }
                 break;
 #endif
+            case 'c':
+                cli_mode = true;
+                break;
             case 'h':
                 showhelp = true;
                 break;
@@ -405,19 +447,16 @@ int main(int argc, char* argv[])
         }
     }
 
+    // In CLI mode the 'help' word works just like -h/--help
+    if (cli_mode && optind < argc && !strcmp(argv[optind], "help"))
+    {
+        optind++;
+        showhelp = true;
+    }
+
     if (showhelp)
     {
-        fprintf(stderr,
-                "Usage: %s [options] [sensors-type]\n"
-                "  Shows all sensors of the specified type.\n"
-                "  If the type is not specified shows all found sensors.\n"
-                "Options:\n"
-#ifdef WITH_REMOTE_HOST
-                "  -H, --host=[USER@]HOST   Operate on remote host (over ssh)\n"
-#endif
-                "  -h, --help               Show this help\n",
-                argv[0]);
-        return EXIT_FAILURE;
+        return usage(argv[0], cli_mode);
     }
 
 #ifdef WITH_REMOTE_HOST
