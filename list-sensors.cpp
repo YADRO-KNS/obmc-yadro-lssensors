@@ -139,8 +139,8 @@ class Properties : public PropertiesMap
             {
                 // The degrees character takes two bytes, but only one place
                 // on the screen. It breaks the alignment.
-                // Force fit the string to 4 screen characters long.
-                ret = "°C  ";
+                // Force fit the string to 3 screen characters long.
+                ret = "°C ";
             }
             else if ("Amperes" == name)
             {
@@ -262,8 +262,10 @@ void printSensorData(const std::string& service, const std::string& path)
     size_t name_pos = path.rfind('/');
     size_t folder_pos = path.rfind('/', name_pos - 1);
 
-    // row format string
-    constexpr auto row_fmt = "%-18s %8s %7s %-4s %7s %7s %7s %7s %7s\n";
+    // row format string, limit sensor name to 19 characters
+    constexpr auto row_fmt = "%-19.19s %8s %7s %-3s %7s %7s %7s %7s %7s\n";
+    // header format, let the Unit column header overlap the LC column a bit
+    constexpr auto hdr_fmt = "%-19.19s %8s %7s %-4s%7s %7s %7s %7s %7s\n";
 
     // Show group header if it is a new type
     static std::string typeName;
@@ -278,7 +280,7 @@ void printSensorData(const std::string& service, const std::string& path)
         }
 
         printf("=== %s ===\n", currentType.c_str());
-        printf(row_fmt, "Name", "Status", "Value", "Unit", "LC", "LNC", "UNC",
+        printf(hdr_fmt, "Name", "Status", "Value", "Unit", "LC", "LNC", "UNC",
                "UC", "NR");
         printf("\n");
 
