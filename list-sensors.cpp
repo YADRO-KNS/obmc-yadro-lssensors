@@ -506,8 +506,16 @@ int main(int argc, char* argv[])
     }
     catch (const sdbusplus::exception::SdBusError& ex)
     {
-        fprintf(stderr, "Error: %s\n", ex.what());
-        return EXIT_FAILURE;
+        if (!strcmp(ex.name(), "org.freedesktop.DBus.Error.FileNotFound"))
+        {
+            fprintf(stderr, "No sensors of selected type are present\n");
+            return usage(argv[0], cli_mode);
+        }
+        else
+        {
+            fprintf(stderr, "Error: %s\n", ex.what());
+            return EXIT_FAILURE;
+        }
     }
 
     for (const auto& obj : objects)
