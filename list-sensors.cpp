@@ -384,7 +384,7 @@ static int usage(char *progname, bool cli_mode)
 #ifdef WITH_REMOTE_HOST
                 "  -H, --host=[USER@]HOST   Operate on remote host (over ssh)\n"
 #endif
-                "  -c, --cli                CLI mode for obmc-yadro-cli\n",
+                "  -c, --cli                CLI mode for obmc-yadro-cli\n"
                 "  -h, --help               Show this help\n",
                 progname);
     }
