@@ -354,6 +354,83 @@ struct CmpSensorsName
     }
 };
 
+using Path = std::string;
+using Service = std::string;
+using Interface = std::string;
+using Interfaces = std::vector<Interface>;
+using ObjectsMap = std::map<Service, Interfaces>;
+using Objects = std::map<Path, ObjectsMap, CmpSensorsName>;
+
+/**
+ * @brief Run infinite loop to print sensor values each \p watch_interval
+ * seconds
+ *
+ * @param watch_list - List of sensor names to print
+ * @param watch_interval - Interval to wait
+ * @param objects - List of all sensors in the system
+ * @return EXIT_FAILURE
+ */
+static int watch_senors(const std::vector<std::string>& watch_list,
+                        const int& watch_interval, const Objects& objects)
+{
+    std::vector<std::pair<Service, Path>> sensors;
+
+    // we want to display sensors in order they were specified by user, so we
+    // cant just loop over objects and then use find on sensors_list
+    for (const auto& name : watch_list)
+    {
+        bool found = false;
+        for (const auto& obj : objects)
+        {
+            size_t name_pos = obj.first.rfind('/');
+            if (name == obj.first.substr(name_pos + 1))
+            {
+                found = true;
+                for (const auto& service : obj.second)
+                {
+                    sensors.emplace_back(service.first, obj.first);
+                }
+            }
+        }
+        if (!found)
+        {
+            fprintf(stderr, "Failed to find sensor %s!\n", name.c_str());
+            return EXIT_FAILURE;
+        }
+    }
+
+    while (true)
+    {
+        time_t t;
+        time(&t);
+        char date_str[20];
+        strftime(date_str, sizeof(date_str), "%Y-%m-%d %H:%M:%S",
+                 localtime(&t));
+        printf("%s", date_str);
+        for (const auto& [service, path] : sensors)
+        {
+            // Ask DBus for all sensors properties
+            auto m = systemBus.new_method_call(service.c_str(), path.c_str(),
+                                               SYSTEMD_PROPERTIES, "GetAll");
+            m.append("");
+            auto r = systemBus.call(m);
+
+            if (r.is_method_error())
+            {
+                fprintf(stderr, "Get properties for %s failed\n", path.c_str());
+                return EXIT_FAILURE;
+            }
+
+            Properties props;
+            r.read(props);
+            printf("\t%s", props.value().c_str());
+        }
+        printf("\n");
+        sleep(watch_interval);
+    }
+    return EXIT_SUCCESS;
+}
+
 /**
  * @brief Prints the application usage help
  *
@@ -363,16 +440,20 @@ static int usage(char *progname, bool cli_mode)
 {
     if (cli_mode)
     {
-        fprintf(stderr,
-                "Sensor readings\n"
-                "  [TYPE] - An optional type of sensors to list\n"
-                "           Availaible types are:\n"
-                "             voltage\n"
-                "             current\n"
-                "             power\n"
-                "             temperature\n"
-                "             fan_pwm\n"
-                "             fan_tach\n");
+        fprintf(stderr, "Sensor readings\n"
+                        "  [TYPE] - An optional type of sensors to list\n"
+                        "           Available types are:\n"
+                        "             voltage\n"
+                        "             current\n"
+                        "             power\n"
+                        "             temperature\n"
+                        "             fan_pwm\n"
+                        "             fan_tach\n"
+                        "  Options:\n"
+                        "      -w, --watch <sensors>    Print sensors values "
+                        "each n seconds (comma-separated list)\n"
+                        "      -n, --interval <secs>    Seconds to wait "
+                        "between updates in watch mode\n");
     }
     else
     {
@@ -385,6 +466,10 @@ static int usage(char *progname, bool cli_mode)
                 "  -H, --host=[USER@]HOST   Operate on remote host (over ssh)\n"
 #endif
                 "  -c, --cli                CLI mode for obmc-yadro-cli\n"
+                "  -w, --watch <sensors>    Print sensors values each n "
+                "seconds (comma-separated list)\n"
+                "  -n, --interval <secs>    Seconds to wait between updates in "
+                "watch mode\n"
                 "  -h, --help               Show this help\n",
                 progname);
     }
@@ -403,20 +488,25 @@ int main(int argc, char* argv[])
 #endif
     bool showhelp = false;
     bool cli_mode = false;
+    bool watch_mode = false;
+    std::vector<std::string> watch_list;
+    int watch_interval = 1;
     const struct option opts[] = {
 #ifdef WITH_REMOTE_HOST
         {"host", required_argument, nullptr, 'H'},
 #endif
         {"cli", no_argument, nullptr, 'c'},
+        {"watch", required_argument, nullptr, 'w'},
+        {"interval", required_argument, nullptr, 'n'},
         {"help", no_argument, nullptr, 'h'},
         // --- end of array ---
         {nullptr, 0, nullptr, '\0'}};
 
     int c;
 #ifdef WITH_REMOTE_HOST
-    while ((c = getopt_long(argc, argv, "H:hc", opts, nullptr)) != -1)
+    while ((c = getopt_long(argc, argv, "H:cw:n:h", opts, nullptr)) != -1)
 #else
-    while ((c = getopt_long(argc, argv, "hc", opts, nullptr)) != -1)
+    while ((c = getopt_long(argc, argv, "cw:n:h", opts, nullptr)) != -1)
 #endif
     {
         switch (c)
@@ -436,6 +526,40 @@ int main(int argc, char* argv[])
 #endif
             case 'c':
                 cli_mode = true;
+                break;
+            case 'w': {
+                watch_mode = true;
+                std::string line(optarg);
+                size_t start;
+                size_t end = 0;
+                const char delim = ',';
+                while ((start = line.find_first_not_of(delim, end)) !=
+                       std::string::npos)
+                {
+                    end = line.find(delim, start);
+                    watch_list.emplace_back(line.substr(start, end - start));
+                }
+                break;
+            }
+            case 'n':
+                try
+                {
+                    watch_interval = std::stoi(optarg);
+                }
+                catch (...)
+                {
+                    fprintf(stderr,
+                            "Can't read interval '%s', should be number of "
+                            "seconds!\n",
+                            optarg);
+                    showhelp = true;
+                }
+                if (watch_interval <= 0)
+                {
+                    fprintf(stderr, "Invalid interval value: %d!\n",
+                            watch_interval);
+                    showhelp = true;
+                }
                 break;
             case 'h':
                 showhelp = true;
@@ -492,12 +616,6 @@ int main(int argc, char* argv[])
     const std::vector<std::string> ifaces = {SENSOR_VALUE_IFACE};
     method.append(root_path, 0, ifaces);
 
-    using Path = std::string;
-    using Service = std::string;
-    using Interface = std::string;
-    using Interfaces = std::vector<Interface>;
-    using ObjectsMap = std::map<Service, Interfaces>;
-    using Objects = std::map<Path, ObjectsMap, CmpSensorsName>;
 
     Objects objects;
     try
@@ -516,6 +634,11 @@ int main(int argc, char* argv[])
             fprintf(stderr, "Error: %s\n", ex.what());
             return EXIT_FAILURE;
         }
+    }
+
+    if (watch_mode)
+    {
+        return watch_senors(watch_list, watch_interval, objects);
     }
 
     for (const auto& obj : objects)
