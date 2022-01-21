@@ -14,6 +14,7 @@
 
 // Bus handler singleton
 static sdbusplus::bus::bus systemBus = sdbusplus::bus::new_default();
+static bool useColors = false;
 
 using PropertyValue = std::variant<int64_t, std::string, bool, double>;
 using PropertyName = std::string;
@@ -95,7 +96,28 @@ class Properties : public PropertiesMap
         {
             return "N/A";
         }
-        return getValue("Value");
+
+        std::string ret(getValue("Value"));
+        if (useColors)
+        {
+            std::string state = status();
+            if (state == "Warning")
+            {
+                // mark Orange
+                ret = "\033[0;33m" + ret + "\033[0m";
+            }
+            else if (state == "Critical")
+            {
+                // mark Red
+                ret = "\033[0;31m" + ret + "\033[0m";
+            }
+            else if (state == "Fatal")
+            {
+                // mark Blinking Red
+                ret = "\033[0;31;5m" + ret + "\033[0m";
+            }
+        }
+        return ret;
     }
     std::string criticalLow() const
     {
@@ -211,11 +233,15 @@ class Properties : public PropertiesMap
             }
             else if (value < 1000)
             {
-                snprintf(ret.data(), ret.size(), "%7.03f", value);
+                const size_t len =
+                    snprintf(ret.data(), ret.size(), "%7.03f", value);
+                ret.resize(len);
             }
             else
             {
-                snprintf(ret.data(), ret.size(), "%7d", (int)(value));
+                const size_t len =
+                    snprintf(ret.data(), ret.size(), "%7d", (int)(value));
+                ret.resize(len);
             }
         }
         else
@@ -224,14 +250,17 @@ class Properties : public PropertiesMap
             auto value = std::get<int64_t>(it->second);
             if (factor < 1.f)
             {
-                snprintf(ret.data(), ret.size(), "%7.03f", value * factor);
+                const size_t len =
+                    snprintf(ret.data(), ret.size(), "%7.03f", value * factor);
+                ret.resize(len);
             }
             else
             {
-                snprintf(ret.data(), ret.size(), "%7d", (int)(value * factor));
+                const size_t len = snprintf(ret.data(), ret.size(), "%7d",
+                                            (int)(value * factor));
+                ret.resize(len);
             }
         }
-
         return ret;
     }
 };
@@ -450,6 +479,7 @@ static int usage(char *progname, bool cli_mode)
                         "             fan_pwm\n"
                         "             fan_tach\n"
                         "  Options:\n"
+                        "      -C, --color              Enable colors\n"
                         "      -w, --watch <sensors>    Print sensors values "
                         "each n seconds (comma-separated list)\n"
                         "      -n, --interval <secs>    Seconds to wait "
@@ -466,6 +496,7 @@ static int usage(char *progname, bool cli_mode)
                 "  -H, --host=[USER@]HOST   Operate on remote host (over ssh)\n"
 #endif
                 "  -c, --cli                CLI mode for obmc-yadro-cli\n"
+                "  -C, --color              Enable colors\n"
                 "  -w, --watch <sensors>    Print sensors values each n "
                 "seconds (comma-separated list)\n"
                 "  -n, --interval <secs>    Seconds to wait between updates in "
@@ -496,6 +527,7 @@ int main(int argc, char* argv[])
         {"host", required_argument, nullptr, 'H'},
 #endif
         {"cli", no_argument, nullptr, 'c'},
+        {"color", no_argument, nullptr, 'C'},
         {"watch", required_argument, nullptr, 'w'},
         {"interval", required_argument, nullptr, 'n'},
         {"help", no_argument, nullptr, 'h'},
@@ -504,9 +536,9 @@ int main(int argc, char* argv[])
 
     int c;
 #ifdef WITH_REMOTE_HOST
-    while ((c = getopt_long(argc, argv, "H:cw:n:h", opts, nullptr)) != -1)
+    while ((c = getopt_long(argc, argv, "H:cCw:n:h", opts, nullptr)) != -1)
 #else
-    while ((c = getopt_long(argc, argv, "cw:n:h", opts, nullptr)) != -1)
+    while ((c = getopt_long(argc, argv, "cCw:n:h", opts, nullptr)) != -1)
 #endif
     {
         switch (c)
@@ -526,6 +558,13 @@ int main(int argc, char* argv[])
 #endif
             case 'c':
                 cli_mode = true;
+                break;
+            case 'C':
+                // ignore "color" flag if output redirected
+                if (isatty(STDOUT_FILENO))
+                {
+                    useColors = true;
+                }
                 break;
             case 'w': {
                 watch_mode = true;
